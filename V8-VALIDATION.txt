@@ -1,0 +1,25 @@
+Minecraft-W / Voxel Sandbox Version 8 validation
+=================================================
+Validated: 2026-08-11 UTC
+
+PASS  import audit                 163 modules / 544 relative imports
+PASS  core deterministic suite    1593 / 1593 checks
+PASS  Phase 3 suite               20 / 20 checks
+PASS  Phase 4 suite               35 / 35 checks
+PASS  Phase 5 suite               41 / 41 checks
+PASS  Version 7 compatibility     26 / 26 checks
+PASS  Version 8 improvement       21 / 21 checks
+PASS  production Vite build       188 modules transformed
+PASS  built-page smoke artifact
+PASS  npm audit                   0 vulnerabilities
+PASS  Chromium/WebGL campaign     194 / 194 checks
+PASS  unexpected console errors   0
+
+Browser coverage includes production startup, WebGL 2 and worker streaming, 70-second water-shader
+stability, inventory, crafting, furnace, chest, combat, death/respawn, save/reload, the High-preset
+SSAO pass, visible Eye flight, dragon battle music/fireball/death effects, arena and iron-cage
+regeneration, End victory/resummoning/credits, and a 390 px phone layout.
+
+The browser run used Chromium WebGL 2 through software SwiftShader. It certifies functional rendering
+in that environment and is not a hardware performance benchmark. This release does not claim exact
+edition parity or completion of every item in the aspirational 122-item roadmap.

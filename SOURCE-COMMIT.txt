@@ -1,0 +1,5 @@
+Minecraft-W FinalV2 source snapshot
+Validated source commit before release metadata: e53be39990642feac9326e514dabf46b466e930b
+Commit date: 2026-08-09T11:58:59Z
+Branch at packaging: master
+Package version: 2.0.0

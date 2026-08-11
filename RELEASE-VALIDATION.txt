@@ -1,0 +1,28 @@
+ARCHIVED — Minecraft-W / Voxel Sandbox Version 7 release validation
+=========================================================
+Superseded by V8-VALIDATION.txt. Historical result from 2026-08-11 UTC.
+
+PASS  import audit                 161 modules / 542 relative imports
+PASS  core deterministic suite    1593 / 1593 checks
+PASS  Phase 3 suite               20 / 20 checks
+PASS  Phase 4 suite               35 / 35 checks
+PASS  Phase 5 suite               41 / 41 checks
+PASS  Version 7 suite             26 / 26 checks
+PASS  production Vite build       183 modules transformed
+PASS  built-page smoke test
+PASS  npm audit                   0 vulnerabilities
+PASS  Chromium/WebGL campaign     185 / 185 checks
+PASS  unexpected console errors   0
+
+Browser coverage includes real production startup and worker streaming, inventory, crafting,
+furnace, chest, mobs, combat, death/respawn, save/reload, 70-second water shader stability,
+the live End dimension, dragon rig/crystals/boss bar, stronghold Eye target, outer-End city,
+shulker storage, dragon victory, exit portal, End gateway, four-crystal resummoning, original
+poem/credits, return home and a 390 px phone layout without horizontal overflow.
+
+The WebGL run used Chromium WebGL 2 through software SwiftShader. It certifies rendering and
+gameplay correctness in that environment; frame-rate results are not presented as hardware
+performance measurements. The included graphics profiles target weak phones, average phones and
+desktop hardware, while actual performance depends on device and browser.
+
+Detailed logs, screenshots and machine-readable browser results are in dist-smoketest/.

@@ -1,0 +1,37 @@
+Minecraft-W overall Phase 1-3 build v6.1.0
+Validation date: 2026-08-10
+
+PASS  npm run audit
+      137 modules, 451 relative imports, no import/export problems
+
+PASS  npm run selftest
+      1474 / 1474 checks
+
+PASS  npm run selftest:phase3
+      20 / 20 checks
+
+PASS  npm run build
+      Vite production bundle, 159 modules transformed
+
+ENVIRONMENT BLOCK  npm run smoketest:browser
+      Playwright Chromium executable is not installed in this runtime.
+      The smoke harness starts correctly and reports the missing executable.
+
+Content/runtime inventory
+      264 blocks
+      325 items
+      33 living mob types, all with skeletal rigs
+      45 biome definitions
+      generated villages with houses, roads, well, farm and chest
+      deterministic villager trading; persistent taming and mount ownership
+      live snow/thunder rendering and GPU bone-texture mob animation
+      accessible Phase 3 blocks, recipes, workstation actions and piston execution
+
+Compatibility
+      Existing published block ids 0-188 retain their meanings.
+      New colour and Phase 3 utility blocks are append-only ids.
+      Phase 3 runtime, brewing, trading and living-entity ownership serialize.
+
+Scope boundary
+      Nether and End terrain remain Phase 4 and Phase 5 work.
+      Browser visual certification requires Playwright Chromium on the target machine.

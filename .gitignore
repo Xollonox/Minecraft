@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-ssr/
+dist-smoketest/
+.vite/
+*.local
+.DS_Store
+npm-debug.log*
+yarn-error.log*
+.idea/
+.vscode/
+.env
+.env.local
+*.log
+coverage/

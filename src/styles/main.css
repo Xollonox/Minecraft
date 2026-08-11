@@ -1,0 +1,2469 @@
+/*
+ * Voxel Sandbox interface styles.
+ *
+ * Design notes
+ * ------------
+ * - An original chunky pixel-inspired look built from CSS only: layered inset and
+ *   outset box-shadows instead of border images, so there is no UI artwork to
+ *   download and nothing is copied from another game.
+ * - Everything scales from two custom properties: `--ui-scale` (player setting)
+ *   and `--unit` (derived). Changing the UI scale therefore resizes the whole
+ *   interface consistently without touching individual rules.
+ * - `100dvh` with a `100vh` fallback, plus `env(safe-area-inset-*)` throughout,
+ *   because a mobile address bar that appears and disappears otherwise crops the
+ *   hotbar, and a notch otherwise eats the pause button.
+ * - Only the canvas suppresses touch gestures; menus keep normal scrolling and
+ *   selection so the page behaves like a page when you are not playing.
+ */
+
+:root {
+  --ui-scale: 1;
+  --unit: calc(4px * var(--ui-scale));
+
+  --color-bg: #12161c;
+  --color-bg-deep: #0a0d12;
+  --color-panel: #23292f;
+  --color-panel-light: #2e353d;
+  --color-panel-dark: #171b20;
+  --color-edge-light: #4a545e;
+  --color-edge-dark: #0d1014;
+
+  --color-text: #e8ecf1;
+  --color-text-dim: #9aa5b1;
+  --color-text-faint: #6b7580;
+
+  --color-accent: #6cc24a;
+  --color-accent-dark: #4e9134;
+  --color-accent-glow: #8ada63;
+  --color-warning: #e0a63c;
+  --color-danger: #d9534f;
+  --color-info: #4a9fd8;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --font-ui: ui-monospace, SFMono-Regular, 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+/* Version 7 story, advancements and statistics. */
+.story-screen { z-index: 48; }
+.story-panel {
+  width: min(880px, calc(100vw - 28px));
+  height: min(780px, calc(100vh - 28px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(17, 10, 24, .97), rgba(5, 6, 13, .98));
+  border-color: rgba(194, 120, 238, .46);
+}
+.story-title { margin: 0; text-align: center; letter-spacing: .15em; }
+.story-content { flex: 1; overflow: auto; padding: 14px 10px 40px; scrollbar-gutter: stable; }
+.story-content h2 { margin: 24px 0 10px; color: #e3c7f4; }
+.end-poem { max-width: 680px; margin: 14vh auto 20vh; text-align: center; }
+.end-poem p { margin: 1.8em 0; line-height: 1.8; color: #e8e2ee; font-size: clamp(15px, 2vw, 20px); }
+.end-credits { min-height: 72vh; display: grid; align-content: center; gap: 18px; text-align: center; }
+.end-credits h2 { font-size: clamp(24px, 5vw, 54px); letter-spacing: .18em; }
+.statistics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; }
+.statistic-card { padding: 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 7px; background: rgba(255,255,255,.045); display: grid; gap: 4px; }
+.statistic-card span { color: #aaa3b2; font-size: 12px; }
+.statistic-card strong { font-size: 18px; }
+.advancement-tree { display: grid; gap: 8px; }
+.advancement { display: flex; gap: 12px; align-items: center; padding: 10px 12px; opacity: .45; border-left: 3px solid #52495a; background: rgba(255,255,255,.035); }
+.advancement.is-unlocked { opacity: 1; border-left-color: #b86ee2; background: rgba(169, 82, 211, .1); }
+.advancement-state { font-size: 22px; color: #d59bf3; }
+.advancement small { display: block; color: #91899a; margin-top: 2px; }
+.death-marker-list p { margin: 5px 0; color: #c8c0cc; }
+@media (max-width: 640px) {
+  .story-panel { height: calc(100vh - 12px); width: calc(100vw - 12px); }
+  .story-content { padding-inline: 2px; }
+  .statistics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.boss-bar { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: min(560px, 72vw); pointer-events: none; }
+.boss-bar-label { display: flex; justify-content: space-between; margin-bottom: 5px; color: #f2d9ff; text-shadow: 0 2px 3px #000; letter-spacing: .04em; }
+.boss-bar-label small { color: #c7a3d8; text-transform: capitalize; }
+.boss-bar-track { height: 12px; border: 2px solid rgba(10,7,14,.9); background: rgba(20,12,25,.85); box-shadow: 0 0 0 1px rgba(232,152,255,.42); }
+.boss-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#76289d,#dc79ff); transition: width .12s linear; }
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * Any author-level `display` declaration beats the user-agent's
+ * `[hidden] { display: none }`, so a rule like `.dialog { display: flex }` makes
+ * `element.hidden = true` do nothing at all. Since `hidden` is how every panel in
+ * this UI is shown and dismissed, that has to be enforced here — otherwise the
+ * main menu, the hotbar and the settings dialog can all be on screen at once.
+ */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--color-bg-deep);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  /* Prevent the whole page from bouncing on iOS when a menu is scrolled. */
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* The canvas is the only element that suppresses browser gestures: pinch zoom,
+     double-tap zoom and scrolling must not fight the camera controls. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  outline: none;
+  cursor: default;
+}
+
+body.pointer-locked #game-canvas {
+  cursor: none;
+}
+
+#ui-root {
+  position: absolute;
+  inset: 0;
+  /* The UI layer is transparent to input by default; interactive children opt in
+     with `pointer-events: auto`. Without this the whole screen would swallow
+     clicks meant for the world. */
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ------------------------------------------------------------------ boot screen */
+
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, #1b2430 0%, #0a0d12 75%);
+  transition: opacity 0.35s ease;
+}
+
+.boot-screen.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-inner {
+  text-align: center;
+  padding: calc(var(--unit) * 6);
+}
+
+.boot-title {
+  margin: 0 0 calc(var(--unit) * 5);
+  font-size: clamp(1.6rem, 6vw, 3rem);
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: var(--color-text);
+  text-shadow: 0 calc(var(--unit) * 0.75) 0 #0a0d12;
+}
+
+.boot-title span {
+  display: block;
+  color: var(--color-accent);
+  font-size: 0.62em;
+  letter-spacing: 0.3em;
+}
+
+.boot-bar {
+  width: min(320px, 70vw);
+  height: calc(var(--unit) * 3);
+  margin: 0 auto;
+  background: var(--color-panel-dark);
+  box-shadow:
+    inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark),
+    0 0 0 calc(var(--unit) * 0.5) var(--color-edge-light);
+}
+
+.boot-bar-fill {
+  height: 100%;
+  width: 15%;
+  background: linear-gradient(90deg, var(--color-accent-dark), var(--color-accent-glow));
+  transition: width 0.2s ease;
+}
+
+.boot-status {
+  margin: calc(var(--unit) * 3) 0 0;
+  color: var(--color-text-dim);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+
+.fatal-error {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--unit) * 6);
+  background: var(--color-bg-deep);
+  text-align: center;
+}
+
+.fatal-error h1 {
+  color: var(--color-danger);
+}
+
+.fatal-error code {
+  display: block;
+  margin-top: calc(var(--unit) * 3);
+  padding: calc(var(--unit) * 3);
+  background: #000;
+  color: var(--color-text-dim);
+  font-size: 0.75rem;
+  text-align: left;
+  max-width: 80ch;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------------- panels */
+
+.panel {
+  background: var(--color-panel);
+  /* Chunky bevel: light on the top/left, dark on the bottom/right, then a hard
+     outer edge. This is the whole "pixel UI" look, in one rule. */
+  box-shadow:
+    inset calc(var(--unit) * 0.75) calc(var(--unit) * 0.75) 0 var(--color-panel-light),
+    inset calc(var(--unit) * -0.75) calc(var(--unit) * -0.75) 0 var(--color-panel-dark),
+    0 0 0 calc(var(--unit) * 0.75) var(--color-edge-dark),
+    0 calc(var(--unit) * 2) calc(var(--unit) * 5) rgba(0, 0, 0, 0.55);
+}
+
+.ui-button {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--unit) * 2);
+  min-height: calc(var(--unit) * 11);
+  padding: calc(var(--unit) * 2.5) calc(var(--unit) * 4);
+  background: var(--color-panel-light);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: calc(0.82rem * var(--ui-scale));
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  /* `manipulation` disables double-tap zoom on the button without disabling
+     scrolling on the panel it sits in. */
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  box-shadow:
+    inset calc(var(--unit) * 0.75) calc(var(--unit) * 0.75) 0 #3c454f,
+    inset calc(var(--unit) * -0.75) calc(var(--unit) * -0.75) 0 var(--color-panel-dark),
+    0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  transition: background 0.12s ease, transform 0.06s ease;
+}
+
+.ui-button:hover:not(:disabled) {
+  background: #3a434d;
+}
+
+.ui-button:active:not(:disabled) {
+  transform: translateY(calc(var(--unit) * 0.5));
+  box-shadow:
+    inset calc(var(--unit) * -0.75) calc(var(--unit) * -0.75) 0 #3c454f,
+    inset calc(var(--unit) * 0.75) calc(var(--unit) * 0.75) 0 var(--color-panel-dark),
+    0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.ui-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-button:focus-visible {
+  outline: calc(var(--unit) * 0.75) solid var(--color-accent-glow);
+  outline-offset: calc(var(--unit) * 0.75);
+}
+
+.ui-button--primary {
+  background: var(--color-accent-dark);
+  box-shadow:
+    inset calc(var(--unit) * 0.75) calc(var(--unit) * 0.75) 0 var(--color-accent-glow),
+    inset calc(var(--unit) * -0.75) calc(var(--unit) * -0.75) 0 #33621f,
+    0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.ui-button--primary:hover:not(:disabled) {
+  background: #58a13c;
+}
+
+.ui-button--danger {
+  background: #8c3a37;
+}
+
+.ui-button--danger:hover:not(:disabled) {
+  background: #a54542;
+}
+
+.ui-button--wide {
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------- screens */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--unit) * 4);
+  padding-top: calc(var(--unit) * 4 + var(--safe-top));
+  padding-bottom: calc(var(--unit) * 4 + var(--safe-bottom));
+  padding-left: calc(var(--unit) * 4 + var(--safe-left));
+  padding-right: calc(var(--unit) * 4 + var(--safe-right));
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen--dim {
+  background: rgba(8, 11, 15, 0.72);
+  backdrop-filter: blur(calc(var(--unit) * 1.5));
+}
+
+.screen--menu {
+  background:
+    linear-gradient(rgba(8, 11, 15, 0.6), rgba(8, 11, 15, 0.82)),
+    radial-gradient(circle at 30% 20%, #22303f 0%, #0a0d12 70%);
+}
+
+.dialog {
+  width: min(560px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--unit) * 5);
+  gap: calc(var(--unit) * 4);
+  /* The dialog itself scrolls, not the page, so a long settings list never
+     makes the whole viewport scroll behind the game. */
+  overflow: hidden;
+}
+
+.dialog--wide {
+  width: min(860px, 100%);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: calc(1.15rem * var(--ui-scale));
+  letter-spacing: 0.12em;
+  color: var(--color-text);
+}
+
+.dialog-subtitle {
+  margin: calc(var(--unit) * -2) 0 0;
+  font-size: calc(0.76rem * var(--ui-scale));
+  color: var(--color-text-dim);
+  line-height: 1.5;
+}
+
+.dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: calc(var(--unit) * 1.5);
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--unit) * 2);
+}
+
+.dialog-actions .ui-button {
+  flex: 1 1 auto;
+}
+
+/* ------------------------------------------------------------------ main menu */
+
+.menu-brand {
+  text-align: center;
+  margin-bottom: calc(var(--unit) * 2);
+}
+
+.menu-brand h1 {
+  margin: 0;
+  font-size: calc(1.7rem * var(--ui-scale));
+  letter-spacing: 0.2em;
+  text-shadow: 0 calc(var(--unit) * 0.75) 0 #0a0d12;
+}
+
+.menu-brand p {
+  margin: calc(var(--unit) * 1.5) 0 0;
+  color: var(--color-text-dim);
+  font-size: calc(0.72rem * var(--ui-scale));
+  letter-spacing: 0.08em;
+}
+
+.world-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.world-entry {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 3);
+  padding: calc(var(--unit) * 2.5);
+  background: var(--color-panel-dark);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.world-entry:hover,
+.world-entry.is-selected {
+  background: #2b333c;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-accent-dark);
+}
+
+.world-entry-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.world-entry-name {
+  display: block;
+  font-size: calc(0.86rem * var(--ui-scale));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.world-entry-meta {
+  display: block;
+  margin-top: calc(var(--unit) * 0.75);
+  font-size: calc(0.66rem * var(--ui-scale));
+  color: var(--color-text-faint);
+}
+
+.world-entry-actions {
+  display: flex;
+  gap: calc(var(--unit) * 1.5);
+  flex-shrink: 0;
+}
+
+.world-entry-actions .ui-button {
+  min-height: calc(var(--unit) * 8);
+  padding: calc(var(--unit) * 1.5) calc(var(--unit) * 2.5);
+  font-size: calc(0.7rem * var(--ui-scale));
+}
+
+.empty-state {
+  padding: calc(var(--unit) * 5);
+  text-align: center;
+  color: var(--color-text-faint);
+  font-size: calc(0.76rem * var(--ui-scale));
+  line-height: 1.7;
+}
+
+/* -------------------------------------------------------------------- controls */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1.5);
+  margin-bottom: calc(var(--unit) * 3);
+}
+
+.field label {
+  font-size: calc(0.72rem * var(--ui-scale));
+  color: var(--color-text-dim);
+  letter-spacing: 0.08em;
+}
+
+.field-row {
+  display: flex;
+  gap: calc(var(--unit) * 2);
+}
+
+.field-row > .text-input {
+  flex: 1 1 auto;
+}
+
+.text-input,
+.select-input {
+  appearance: none;
+  width: 100%;
+  min-height: calc(var(--unit) * 10);
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 2.5);
+  background: var(--color-panel-dark);
+  color: var(--color-text);
+  border: 0;
+  font-family: inherit;
+  font-size: calc(0.8rem * var(--ui-scale));
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.select-input {
+  /* Room for the arrow drawn by the background gradient. */
+  padding-right: calc(var(--unit) * 8);
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-text-dim) 50%),
+    linear-gradient(135deg, var(--color-text-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - calc(var(--unit) * 4.5)) calc(50% - 1px),
+    calc(100% - calc(var(--unit) * 2.5)) calc(50% - 1px);
+  background-size: calc(var(--unit) * 2) calc(var(--unit) * 2);
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.text-input:focus-visible,
+.select-input:focus-visible {
+  outline: calc(var(--unit) * 0.5) solid var(--color-accent);
+  outline-offset: 0;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 3);
+  padding: calc(var(--unit) * 2) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.setting-label {
+  flex: 1 1 45%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: calc(var(--unit) * 1.5);
+}
+
+.setting-name {
+  font-size: calc(0.78rem * var(--ui-scale));
+}
+
+.setting-hint {
+  flex: 1 1 100%;
+  font-size: calc(0.64rem * var(--ui-scale));
+  color: var(--color-text-faint);
+  line-height: 1.5;
+}
+
+.setting-badge {
+  padding: 0 calc(var(--unit) * 1.25);
+  background: var(--color-warning);
+  color: #241a05;
+  font-size: calc(0.56rem * var(--ui-scale));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.setting-control {
+  flex: 1 1 55%;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 2);
+  min-width: 0;
+}
+
+.setting-value {
+  flex: 0 0 auto;
+  min-width: calc(var(--unit) * 14);
+  text-align: right;
+  font-size: calc(0.72rem * var(--ui-scale));
+  color: var(--color-accent-glow);
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='range'] {
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: calc(var(--unit) * 6);
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: calc(var(--unit) * 2);
+  background: var(--color-panel-dark);
+  box-shadow: inset 0 0 0 1px var(--color-edge-dark);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 5);
+  margin-top: calc(var(--unit) * -1.5);
+  background: var(--color-accent);
+  box-shadow:
+    inset calc(var(--unit) * 0.5) calc(var(--unit) * 0.5) 0 var(--color-accent-glow),
+    0 0 0 1px var(--color-edge-dark);
+}
+
+input[type='range']::-moz-range-track {
+  height: calc(var(--unit) * 2);
+  background: var(--color-panel-dark);
+  box-shadow: inset 0 0 0 1px var(--color-edge-dark);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 5);
+  border: 0;
+  border-radius: 0;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-edge-dark);
+}
+
+.toggle {
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(var(--unit) * 13);
+  height: calc(var(--unit) * 6.5);
+  padding: 0;
+  background: var(--color-panel-dark);
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--unit) * 0.75);
+  left: calc(var(--unit) * 0.75);
+  width: calc(var(--unit) * 5);
+  height: calc(var(--unit) * 5);
+  background: var(--color-text-faint);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.toggle[aria-checked='true'] {
+  background: var(--color-accent-dark);
+}
+
+.toggle[aria-checked='true']::after {
+  transform: translateX(calc(var(--unit) * 6.5));
+  background: var(--color-accent-glow);
+}
+
+.toggle:focus-visible {
+  outline: calc(var(--unit) * 0.5) solid var(--color-accent-glow);
+}
+
+/* -------------------------------------------------------------------- settings */
+
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--unit) * 1.5);
+}
+
+.tab-bar .ui-button {
+  flex: 1 1 auto;
+  min-height: calc(var(--unit) * 9);
+  font-size: calc(0.72rem * var(--ui-scale));
+}
+
+.tab-bar .ui-button[aria-selected='true'] {
+  background: var(--color-accent-dark);
+  box-shadow:
+    inset calc(var(--unit) * 0.75) calc(var(--unit) * 0.75) 0 var(--color-accent-glow),
+    inset calc(var(--unit) * -0.75) calc(var(--unit) * -0.75) 0 #33621f,
+    0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.settings-note {
+  margin: 0;
+  padding: calc(var(--unit) * 2.5);
+  background: rgba(224, 166, 60, 0.14);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-warning);
+  color: #f0d49a;
+  font-size: calc(0.68rem * var(--ui-scale));
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------------------ HUD */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud[hidden] {
+  display: none;
+}
+
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--unit) * 5);
+  height: calc(var(--unit) * 5);
+  transform: translate(-50%, -50%);
+  opacity: 0.85;
+}
+
+.crosshair::before,
+.crosshair::after {
+  content: '';
+  position: absolute;
+  background: #fff;
+  /* Difference blending keeps the crosshair visible against both a bright sky
+     and a dark cave without needing an outline. */
+  mix-blend-mode: difference;
+}
+
+.crosshair::before {
+  left: 50%;
+  top: 0;
+  width: calc(var(--unit) * 0.5);
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.crosshair::after {
+  top: 50%;
+  left: 0;
+  height: calc(var(--unit) * 0.5);
+  width: 100%;
+  transform: translateY(-50%);
+}
+
+.underwater-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(20, 90, 130, 0.28) 0%, rgba(8, 48, 78, 0.72) 100%);
+  opacity: 0;
+  transition: opacity 0.18s linear;
+}
+
+.underwater-overlay.lava {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 120, 22, 0.36) 0%, rgba(130, 18, 0, 0.86) 100%);
+}
+
+.vignette-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  opacity: 0;
+  transition: opacity 0.25s linear;
+}
+
+.hud-top-left {
+  position: absolute;
+  top: calc(var(--unit) * 2 + var(--safe-top));
+  left: calc(var(--unit) * 2 + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1);
+  font-size: calc(0.66rem * var(--ui-scale));
+  color: var(--color-text);
+  text-shadow: 0 1px 2px #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-top-right {
+  position: absolute;
+  top: calc(var(--unit) * 2 + var(--safe-top));
+  right: calc(var(--unit) * 2 + var(--safe-right));
+  display: flex;
+  gap: calc(var(--unit) * 1.5);
+  pointer-events: auto;
+}
+
+.hud-icon-button {
+  width: calc(var(--unit) * 10);
+  height: calc(var(--unit) * 10);
+  padding: 0;
+  font-size: calc(0.9rem * var(--ui-scale));
+  background: rgba(23, 27, 32, 0.72);
+}
+
+.hud-chip {
+  padding: calc(var(--unit) * 0.75) calc(var(--unit) * 1.75);
+  background: rgba(10, 13, 18, 0.55);
+  border-radius: 2px;
+}
+
+.save-indicator {
+  position: absolute;
+  bottom: calc(var(--unit) * 2 + var(--safe-bottom));
+  right: calc(var(--unit) * 2 + var(--safe-right));
+  padding: calc(var(--unit) * 1.25) calc(var(--unit) * 2.5);
+  background: rgba(10, 13, 18, 0.7);
+  color: var(--color-text-dim);
+  font-size: calc(0.66rem * var(--ui-scale));
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.save-indicator.is-visible {
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------------- hotbar */
+
+.hotbar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--unit) * 3 + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 1);
+  padding: calc(var(--unit) * 1);
+  background: rgba(10, 13, 18, 0.65);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  pointer-events: auto;
+  touch-action: none;
+  z-index: 25;
+  max-width: calc(100vw - var(--safe-left) - var(--safe-right) - var(--unit) * 2);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hotbar-slot {
+  position: relative;
+  width: calc(var(--unit) * 11);
+  height: calc(var(--unit) * 11);
+  flex: 0 0 auto;
+  background: rgba(35, 41, 47, 0.8);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hotbar-slot.is-selected {
+  background: rgba(60, 70, 80, 0.9);
+  box-shadow:
+    inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark),
+    0 0 0 calc(var(--unit) * 0.75) var(--color-text);
+}
+
+.hotbar-bag-btn {
+  margin-left: calc(var(--unit) * 1.5);
+  background: rgba(45, 53, 62, 0.85);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--color-text);
+  font-family: inherit;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.hotbar-bag-btn:hover,
+.hotbar-bag-btn:focus-visible {
+  background: rgba(60, 70, 80, 0.95);
+  box-shadow:
+    inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark),
+    0 0 0 calc(var(--unit) * 0.5) var(--color-accent);
+  outline: none;
+}
+
+.hotbar-bag-btn:active {
+  background: rgba(108, 194, 74, 0.4);
+  box-shadow:
+    inset 0 0 0 calc(var(--unit) * 0.5) var(--color-accent-glow);
+}
+
+.hotbar-bag-icon {
+  font-size: calc(0.82rem * var(--ui-scale));
+  line-height: 1;
+  pointer-events: none;
+}
+
+.hotbar-bag-label {
+  font-size: calc(0.48rem * var(--ui-scale));
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  color: var(--color-text);
+  line-height: 1;
+  pointer-events: none;
+}
+
+@media (max-width: 540px) {
+  .hotbar {
+    gap: calc(var(--unit) * 0.5);
+    padding: calc(var(--unit) * 0.5);
+  }
+  .hotbar-slot {
+    width: calc(var(--unit) * 9.5);
+    height: calc(var(--unit) * 9.5);
+  }
+}
+
+.hotbar-slot img {
+  width: 82%;
+  height: 82%;
+  /* Pixel art must never be smoothed when scaled up. */
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.hotbar-slot-count {
+  position: absolute;
+  right: calc(var(--unit) * 0.5);
+  bottom: calc(var(--unit) * 0.25);
+  font-size: calc(0.62rem * var(--ui-scale));
+  text-shadow: 0 1px 2px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+
+.hotbar-slot-key {
+  position: absolute;
+  left: calc(var(--unit) * 0.5);
+  top: calc(var(--unit) * 0.25);
+  font-size: calc(0.52rem * var(--ui-scale));
+  color: var(--color-text-faint);
+  pointer-events: none;
+}
+
+.hotbar-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + var(--unit) * 2);
+  transform: translateX(-50%);
+  padding: calc(var(--unit) * 1) calc(var(--unit) * 2);
+  background: rgba(10, 13, 18, 0.85);
+  color: var(--color-text);
+  font-size: calc(0.68rem * var(--ui-scale));
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.hotbar-tooltip.is-visible {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ inventory & block palette */
+
+.block-palette-panel {
+  width: min(940px, 92vw);
+  max-height: min(880px, 90vh);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 3);
+  padding: calc(var(--unit) * 4);
+  overflow: hidden;
+}
+
+.block-palette-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(var(--unit) * 3);
+}
+
+.block-palette-title-group .dialog-title {
+  margin: 0;
+  font-size: calc(1.1rem * var(--ui-scale));
+  letter-spacing: 0.08em;
+  color: var(--color-text);
+}
+
+.block-palette-subtitle {
+  margin: calc(var(--unit) * 1) 0 0;
+  font-size: calc(0.7rem * var(--ui-scale));
+  color: var(--color-text-dim);
+}
+
+.block-palette-close-btn {
+  background: var(--color-panel-dark);
+  color: var(--color-text-dim);
+  border: 0;
+  width: calc(var(--unit) * 8);
+  height: calc(var(--unit) * 8);
+  font-size: calc(0.9rem * var(--ui-scale));
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.block-palette-close-btn:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* Search bar */
+.block-palette-search-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 2);
+  background: var(--color-bg-deep);
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 3);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.block-palette-search-icon {
+  font-size: calc(0.85rem * var(--ui-scale));
+}
+
+.block-palette-search-input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: calc(0.78rem * var(--ui-scale));
+}
+
+.block-palette-search-clear {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  padding: 0 calc(var(--unit) * 1);
+}
+
+.block-palette-search-clear:hover {
+  color: var(--color-text);
+}
+
+.block-palette-count-badge {
+  font-size: calc(0.65rem * var(--ui-scale));
+  color: var(--color-text-faint);
+  background: var(--color-panel-dark);
+  padding: calc(var(--unit) * 1) calc(var(--unit) * 2);
+  border-radius: 4px;
+}
+
+/* Category Filter Tabs */
+.block-palette-categories {
+  display: flex;
+  gap: calc(var(--unit) * 1.5);
+  overflow-x: auto;
+  padding-bottom: calc(var(--unit) * 1);
+  scrollbar-width: thin;
+}
+
+.block-palette-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--unit) * 1.5);
+  padding: calc(var(--unit) * 1.5) calc(var(--unit) * 3);
+  background: var(--color-panel-dark);
+  color: var(--color-text-dim);
+  border: 0;
+  font-family: inherit;
+  font-size: calc(0.7rem * var(--ui-scale));
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  transition: all 0.1s ease;
+}
+
+.block-palette-tab:hover {
+  background: var(--color-panel-light);
+  color: var(--color-text);
+}
+
+.block-palette-tab.is-active {
+  background: var(--color-accent-dark);
+  color: #fff;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-accent-glow);
+}
+
+.block-palette-tab .tab-count {
+  font-size: 0.85em;
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Target Hotbar Selector */
+.block-palette-target-bar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 3);
+  background: var(--color-panel-light);
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 3);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.target-bar-label {
+  font-size: calc(0.68rem * var(--ui-scale));
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.target-slot-group {
+  display: flex;
+  gap: calc(var(--unit) * 1.5);
+  flex-wrap: wrap;
+}
+
+.target-slot-btn {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 1);
+  padding: calc(var(--unit) * 1) calc(var(--unit) * 2.5);
+  background: var(--color-panel-dark);
+  color: var(--color-text-dim);
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(0.7rem * var(--ui-scale));
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+}
+
+.target-slot-btn.is-target {
+  background: var(--color-accent);
+  color: #0a0d12;
+  font-weight: bold;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) #fff;
+}
+
+.target-slot-icon {
+  width: calc(var(--unit) * 4);
+  height: calc(var(--unit) * 4);
+  image-rendering: pixelated;
+}
+
+/* Content Layout (Grid + Inspector) */
+.block-palette-content-layout {
+  display: flex;
+  gap: calc(var(--unit) * 3);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.block-palette-grid-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: calc(var(--unit) * 1);
+}
+
+.block-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 26), 1fr));
+  gap: calc(var(--unit) * 2);
+}
+
+.block-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--unit) * 2.5) calc(var(--unit) * 2);
+  background: var(--color-panel-dark);
+  border: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  transition: transform 0.1s ease, background 0.1s ease;
+  touch-action: manipulation;
+  min-height: calc(var(--unit) * 24);
+}
+
+.block-card:hover,
+.block-card.is-focused {
+  background: var(--color-panel-light);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-accent);
+  transform: translateY(-2px);
+}
+
+.block-card-icon {
+  width: calc(var(--unit) * 12);
+  height: calc(var(--unit) * 12);
+  image-rendering: pixelated;
+  margin-bottom: calc(var(--unit) * 1.5);
+}
+
+.block-card-name {
+  font-size: calc(0.68rem * var(--ui-scale));
+  color: var(--color-text);
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.block-card-category-tag {
+  font-size: calc(0.55rem * var(--ui-scale));
+  color: var(--color-text-faint);
+  margin-top: calc(var(--unit) * 1);
+  text-transform: uppercase;
+}
+
+.block-palette-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--unit) * 10);
+  color: var(--color-text-dim);
+  gap: calc(var(--unit) * 2);
+}
+
+.block-palette-empty .empty-icon {
+  font-size: 2rem;
+}
+
+/* Inspector Panel */
+.block-palette-inspector {
+  width: min(280px, 32%);
+  background: var(--color-panel-dark);
+  padding: calc(var(--unit) * 3);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 3);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  overflow-y: auto;
+}
+
+.inspector-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border-bottom: 1px solid var(--color-edge-light);
+  padding-bottom: calc(var(--unit) * 3);
+}
+
+.inspector-icon {
+  width: calc(var(--unit) * 18);
+  height: calc(var(--unit) * 18);
+  image-rendering: pixelated;
+  margin-bottom: calc(var(--unit) * 2);
+}
+
+.inspector-title {
+  margin: 0;
+  font-size: calc(0.88rem * var(--ui-scale));
+  color: var(--color-text);
+}
+
+.inspector-category-badge {
+  font-size: calc(0.6rem * var(--ui-scale));
+  color: var(--color-accent-glow);
+  background: rgba(108, 194, 74, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: calc(var(--unit) * 1);
+}
+
+.inspector-stats {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1.5);
+}
+
+.inspector-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: calc(0.65rem * var(--ui-scale));
+}
+
+.inspector-stat-row .stat-label {
+  color: var(--color-text-dim);
+}
+
+.inspector-stat-row .stat-value {
+  color: var(--color-text);
+  font-weight: bold;
+}
+
+.inspector-pick-btn {
+  margin-top: auto;
+  width: 100%;
+}
+
+.block-palette-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: calc(var(--unit) * 1);
+}
+
+@media (max-width: 768px) {
+  .block-palette-content-layout {
+    flex-direction: column;
+  }
+  .block-palette-inspector {
+    width: 100%;
+  }
+}
+
+/* ------------------------------------------------------------- mobile controls */
+
+.mobile-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* All touch handling is done with Pointer Events on these elements; the browser
+     must not also interpret the gestures. */
+  touch-action: none;
+}
+
+.mobile-controls[hidden] {
+  display: none;
+}
+
+.touch-look-area {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-joystick {
+  position: absolute;
+  bottom: calc(var(--unit) * 6 + var(--safe-bottom));
+  left: calc(var(--unit) * 6 + var(--safe-left));
+  width: calc(var(--unit) * 34 * var(--joystick-scale, 1));
+  height: calc(var(--unit) * 34 * var(--joystick-scale, 1));
+  border-radius: 50%;
+  background: rgba(20, 25, 31, 0.35);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.75) rgba(232, 236, 241, 0.35);
+  opacity: var(--touch-opacity, 0.5);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.mobile-controls.is-left-handed .touch-joystick {
+  left: auto;
+  right: calc(var(--unit) * 6 + var(--safe-right));
+}
+
+.touch-joystick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42%;
+  height: 42%;
+  border-radius: 50%;
+  background: rgba(232, 236, 241, 0.5);
+  box-shadow: 0 0 0 calc(var(--unit) * 0.5) rgba(10, 13, 18, 0.5);
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+
+.touch-buttons {
+  position: absolute;
+  right: calc(var(--unit) * 5 + var(--safe-right));
+  bottom: calc(var(--unit) * 6 + var(--safe-bottom));
+  display: grid;
+  /* Fixed 3x3: buttons are pinned to explicit cells by MobileControls so that
+     hiding one never moves the others. */
+  grid-template-columns: repeat(3, auto);
+  grid-template-rows: repeat(3, auto);
+  gap: calc(var(--unit) * 2);
+  justify-items: end;
+  opacity: var(--touch-opacity, 0.5);
+}
+
+.mobile-controls.is-left-handed .touch-buttons {
+  right: auto;
+  left: calc(var(--unit) * 5 + var(--safe-left));
+  justify-items: start;
+}
+
+.touch-button {
+  width: calc(var(--unit) * 15 * var(--button-scale, 1));
+  height: calc(var(--unit) * 15 * var(--button-scale, 1));
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(35, 41, 47, 0.72);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: calc(0.62rem * var(--ui-scale) * var(--button-scale, 1));
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) rgba(232, 236, 241, 0.28);
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  display: grid;
+  place-items: center;
+  line-height: 1.1;
+}
+
+.touch-button.is-active {
+  background: rgba(108, 194, 74, 0.55);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-accent-glow);
+}
+
+.touch-button--wide {
+  grid-column: span 2;
+  width: auto;
+  min-width: calc(var(--unit) * 32 * var(--button-scale, 1));
+  border-radius: calc(var(--unit) * 7);
+}
+
+.touch-utility {
+  position: absolute;
+  top: calc(var(--unit) * 2 + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: calc(var(--unit) * 1.5);
+  opacity: var(--touch-opacity, 0.5);
+}
+
+.rotate-notice {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--unit) * 6);
+  background: rgba(8, 11, 15, 0.92);
+  text-align: center;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.rotate-notice[hidden] {
+  display: none;
+}
+
+.rotate-notice-inner {
+  max-width: 40ch;
+  line-height: 1.7;
+  color: var(--color-text-dim);
+  font-size: calc(0.8rem * var(--ui-scale));
+}
+
+.rotate-notice-icon {
+  display: block;
+  font-size: calc(2.4rem * var(--ui-scale));
+  margin-bottom: calc(var(--unit) * 3);
+}
+
+/* ---------------------------------------------------------------- debug overlay */
+
+.debug-overlay {
+  position: absolute;
+  top: calc(var(--unit) * 2 + var(--safe-top));
+  left: calc(var(--unit) * 2 + var(--safe-left));
+  max-width: min(46ch, 62vw);
+  padding: calc(var(--unit) * 2);
+  background: rgba(6, 9, 13, 0.76);
+  color: #cfe8b6;
+  font-size: calc(0.62rem * var(--ui-scale));
+  line-height: 1.55;
+  white-space: pre;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+
+.debug-overlay[hidden] {
+  display: none;
+}
+
+.debug-overlay-right {
+  position: absolute;
+  top: calc(var(--unit) * 2 + var(--safe-top));
+  right: calc(var(--unit) * 2 + var(--safe-right));
+  left: auto;
+  text-align: right;
+  color: #b6d8e8;
+}
+
+/* -------------------------------------------------------------- notifications */
+
+.notifications {
+  position: absolute;
+  top: calc(var(--unit) * 14 + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--unit) * 1.5);
+  width: min(520px, calc(100vw - var(--unit) * 8));
+  pointer-events: none;
+}
+
+.notification {
+  width: 100%;
+  padding: calc(var(--unit) * 2) calc(var(--unit) * 3);
+  background: rgba(23, 27, 32, 0.92);
+  box-shadow: inset calc(var(--unit) * 0.75) 0 0 var(--color-info);
+  color: var(--color-text);
+  font-size: calc(0.7rem * var(--ui-scale));
+  line-height: 1.5;
+  animation: notification-in 0.22s ease;
+}
+
+.notification.is-leaving {
+  animation: notification-out 0.24s ease forwards;
+}
+
+.notification--warning {
+  box-shadow: inset calc(var(--unit) * 0.75) 0 0 var(--color-warning);
+}
+
+.notification--error {
+  box-shadow: inset calc(var(--unit) * 0.75) 0 0 var(--color-danger);
+}
+
+.notification--success {
+  box-shadow: inset calc(var(--unit) * 0.75) 0 0 var(--color-accent);
+}
+
+@keyframes notification-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--unit) * -2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes notification-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--unit) * -2));
+  }
+}
+
+/* ------------------------------------------------------------- loading screen */
+
+.loading-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 45%, #1b2430 0%, #080b0f 78%);
+  pointer-events: auto;
+  z-index: 15;
+}
+
+.loading-screen[hidden] {
+  display: none;
+}
+
+.loading-inner {
+  width: min(420px, 84vw);
+  text-align: center;
+}
+
+.loading-title {
+  margin: 0 0 calc(var(--unit) * 4);
+  font-size: calc(1.05rem * var(--ui-scale));
+  letter-spacing: 0.14em;
+}
+
+.progress-bar {
+  height: calc(var(--unit) * 3.5);
+  background: var(--color-panel-dark);
+  box-shadow:
+    inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark),
+    0 0 0 calc(var(--unit) * 0.5) var(--color-edge-light);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-accent-dark), var(--color-accent-glow));
+  transition: width 0.24s ease;
+}
+
+.loading-status {
+  margin: calc(var(--unit) * 3) 0 0;
+  color: var(--color-text-dim);
+  font-size: calc(0.72rem * var(--ui-scale));
+  min-height: 1.4em;
+}
+
+.loading-tip {
+  margin: calc(var(--unit) * 5) 0 0;
+  padding: calc(var(--unit) * 2.5);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-faint);
+  font-size: calc(0.66rem * var(--ui-scale));
+  line-height: 1.7;
+}
+
+/* --------------------------------------------------------------- responsiveness */
+
+@media (max-width: 620px) {
+  .setting-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: calc(var(--unit) * 1.5);
+  }
+
+  .setting-control {
+    flex-basis: auto;
+  }
+
+  .dialog {
+    padding: calc(var(--unit) * 3.5);
+  }
+
+  .world-entry {
+    flex-wrap: wrap;
+  }
+}
+
+/* A short landscape viewport is a phone held sideways: shrink vertical padding so
+   the dialog still fits without the page scrolling. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .screen {
+    padding-top: calc(var(--unit) * 2 + var(--safe-top));
+    padding-bottom: calc(var(--unit) * 2 + var(--safe-bottom));
+  }
+
+  .dialog {
+    gap: calc(var(--unit) * 2.5);
+    padding: calc(var(--unit) * 3);
+  }
+
+  .menu-brand h1 {
+    font-size: calc(1.2rem * var(--ui-scale));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
+}
+
+
+/* ==========================================================================
+   Survival status bars
+   ==========================================================================
+   Hearts, drumsticks and bubbles sit directly above the hotbar. They are laid
+   out with the same `--unit` scale as everything else, so they follow the UI
+   scale setting and stay thumb-comfortable on a phone without a second set of
+   media queries.
+
+   Icons are pure CSS: these are UI chrome rather than world art, and drawing
+   them from the texture atlas would tie the HUD to the atlas layout for shapes
+   that are a few gradients. */
+
+.hud-status-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.status-bars {
+  position: absolute;
+  left: 50%;
+  /* Must clear the hotbar completely. The hotbar sits at `--unit * 3` with a
+     `--unit * 11` slot plus `--unit * 1` padding top and bottom, so its top edge
+     is at `--unit * 16`; anything below that overlaps the slots. */
+  bottom: calc(var(--unit) * 18 + var(--safe-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--unit) * 1.5);
+  /* Matches the hotbar's own width so the two rows line up: 9 slots of 11 units
+     plus 8 gaps of 1 unit plus 2 units of padding. */
+  width: calc(var(--unit) * 109);
+  max-width: calc(100vw - var(--safe-left) - var(--safe-right) - var(--unit) * 4);
+  pointer-events: none;
+}
+
+.status-bars-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: calc(var(--unit) * 4);
+}
+
+.status-bars-left,
+.status-bars-right {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 0.5);
+}
+
+.status-bars-right {
+  align-items: flex-end;
+}
+
+.status-row {
+  display: flex;
+  /* A visible gap matters: at a one-pixel gap ten hearts read as a single red
+     bar rather than as ten countable units. */
+  gap: calc(var(--unit) * 0.75);
+}
+
+/* Icons are drawn as CSS masks over a solid colour rather than as gradient
+   stacks. Gradients cannot express a heart or a drumstick convincingly at 12px —
+   the first attempt here read as a plain square — whereas a mask gives an exact
+   silhouette, keeps the colour in CSS (so full/half/empty stay class toggles),
+   and needs no image files.
+
+   The shapes are deliberately blocky: `shape-rendering="crispEdges"` and integer
+   rect coordinates give pixel art that matches the world's own texture style. */
+
+.status-icon {
+  width: calc(var(--unit) * 3.25);
+  height: calc(var(--unit) * 3.25);
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-position: center;
+  mask-position: center;
+  /* A dark outline keeps every icon legible against snow, sand and sky alike. */
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.9)) drop-shadow(1px 0 0 rgba(0, 0, 0, 0.55));
+}
+
+/* --- hearts --- */
+
+.status-heart {
+  --icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 10' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='3' height='1'/%3E%3Crect x='8' y='0' width='3' height='1'/%3E%3Crect x='1' y='1' width='5' height='1'/%3E%3Crect x='7' y='1' width='5' height='1'/%3E%3Crect x='0' y='2' width='13' height='2'/%3E%3Crect x='1' y='4' width='11' height='1'/%3E%3Crect x='2' y='5' width='9' height='1'/%3E%3Crect x='3' y='6' width='7' height='1'/%3E%3Crect x='4' y='7' width='5' height='1'/%3E%3Crect x='5' y='8' width='3' height='1'/%3E%3Crect x='6' y='9' width='1' height='1'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+}
+
+.status-heart.is-full {
+  color: #d8382f;
+}
+
+.status-heart.is-empty {
+  color: rgba(38, 14, 12, 0.78);
+}
+
+/* A half heart is the empty silhouette with a filled left half laid over it,
+   using the same mask so the two halves line up exactly. */
+.status-heart.is-half {
+  color: rgba(38, 14, 12, 0.78);
+  position: relative;
+}
+
+.status-heart.is-half::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: #d8382f;
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  clip-path: inset(0 50% 0 0);
+}
+
+/* --- armour --- */
+
+.status-armour {
+  --icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Crect x='2' y='0' width='8' height='1'/%3E%3Crect x='1' y='1' width='10' height='2'/%3E%3Crect x='1' y='3' width='2' height='4'/%3E%3Crect x='9' y='3' width='2' height='4'/%3E%3Crect x='2' y='7' width='8' height='1'/%3E%3Crect x='3' y='8' width='6' height='1'/%3E%3Crect x='4' y='9' width='4' height='1'/%3E%3Crect x='5' y='10' width='2' height='2'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+}
+
+.status-armour.is-full {
+  color: #c7d0dc;
+}
+
+.status-armour.is-empty {
+  color: rgba(30, 36, 44, 0.78);
+}
+
+.status-armour.is-half {
+  color: rgba(30, 36, 44, 0.78);
+  position: relative;
+}
+
+.status-armour.is-half::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: #c7d0dc;
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  clip-path: inset(0 50% 0 0);
+}
+
+/* --- hunger --- */
+
+.status-hunger {
+  /* A drumstick: rounded meat at the top right, bone tapering to the lower
+     left, which is instantly distinguishable from a heart in peripheral vision. */
+  --icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Crect x='5' y='0' width='4' height='1'/%3E%3Crect x='4' y='1' width='6' height='1'/%3E%3Crect x='3' y='2' width='8' height='2'/%3E%3Crect x='3' y='4' width='7' height='1'/%3E%3Crect x='2' y='5' width='6' height='1'/%3E%3Crect x='1' y='6' width='5' height='1'/%3E%3Crect x='0' y='7' width='4' height='1'/%3E%3Crect x='0' y='8' width='3' height='2'/%3E%3Crect x='1' y='10' width='2' height='1'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+}
+
+.status-hunger.is-full {
+  color: #cf8f3c;
+}
+
+.status-hunger.is-empty {
+  color: rgba(36, 26, 14, 0.78);
+}
+
+.status-hunger.is-half {
+  color: rgba(36, 26, 14, 0.78);
+  position: relative;
+}
+
+.status-hunger.is-half::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: #cf8f3c;
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  clip-path: inset(0 50% 0 0);
+}
+
+/* --- air bubbles --- */
+
+.status-bubble {
+  --icon-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='4' height='1'/%3E%3Crect x='1' y='1' width='8' height='1'/%3E%3Crect x='0' y='2' width='10' height='6'/%3E%3Crect x='1' y='8' width='8' height='1'/%3E%3Crect x='3' y='9' width='4' height='1'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--icon-mask);
+  mask-image: var(--icon-mask);
+  border-radius: 50%;
+}
+
+.status-bubble.is-full,
+.status-bubble.is-half {
+  color: #6fb8e8;
+  /* An inset highlight sells it as a bubble rather than a dot. */
+  box-shadow: inset calc(var(--unit) * 0.5) calc(var(--unit) * 0.5) 0 rgba(255, 255, 255, 0.7);
+}
+
+/* An emptied bubble simply disappears rather than leaving a socket, which is
+   what makes a draining air meter read as urgent. */
+.status-bubble.is-empty {
+  opacity: 0;
+}
+
+/* --- damage flash --- */
+
+.damage-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(190, 30, 25, 0.12) 30%,
+    rgba(190, 30, 25, 0.75) 100%
+  );
+  opacity: 0;
+  /* Fades on its own; JS only writes the target opacity. */
+  transition: opacity 140ms ease-out;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   XP bar (survival HUD)
+   ========================================================================== */
+
+.status-xp-row {
+  display: flex;
+  width: 100%;
+}
+
+.status-xp-bar {
+  position: relative;
+  flex: 1;
+  height: calc(var(--unit) * 2.6);
+  background: rgba(0, 0, 0, 0.65);
+  border: calc(var(--unit) * 0.18) solid rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.status-xp-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, #2ecc71, #7af0a0 60%, #b8ffcc);
+  transition: width 180ms ease-out;
+}
+
+.status-xp-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: calc(var(--unit) * 1.9);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0,0,0,0.8);
+}
+
+/* ==========================================================================
+   Hotbar durability bars
+   ========================================================================== */
+
+.hotbar-slot-durability {
+  position: absolute;
+  left: calc(var(--unit) * 0.5);
+  right: calc(var(--unit) * 0.5);
+  bottom: calc(var(--unit) * 0.5);
+  height: calc(var(--unit) * 0.75);
+  background: rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+
+.hotbar-slot-durability-fill {
+  height: 100%;
+  width: 100%;
+  /* Colour is written from JS, which interpolates green to red by remaining
+     durability so wear is readable without counting pixels. */
+  background: var(--color-accent);
+}
+
+/* ==========================================================================
+   Death screen
+   ========================================================================== */
+
+.screen--death {
+  /* Warmer and heavier than the normal dim, so death reads as a state change
+     rather than another dialog. */
+  background: rgba(58, 10, 8, 0.62);
+}
+
+.dialog--death {
+  text-align: center;
+  max-width: calc(var(--unit) * 95);
+}
+
+.death-cause {
+  margin: calc(var(--unit) * 2) 0 calc(var(--unit) * 1);
+  font-size: calc(var(--unit) * 4);
+  color: var(--color-text);
+}
+
+.death-detail {
+  margin: 0 0 calc(var(--unit) * 3);
+  color: var(--color-text-dim);
+  font-size: calc(var(--unit) * 3.25);
+}
+
+/* Stacked full-width actions: comfortable thumb targets, and no reliance on
+   hover or on there being room for a horizontal row. */
+.dialog-actions--stacked {
+  flex-direction: column;
+  gap: calc(var(--unit) * 2);
+}
+
+.dialog-actions--stacked .death-action {
+  width: 100%;
+  min-height: calc(var(--unit) * 11);
+  font-size: calc(var(--unit) * 3.5);
+}
+
+/* On a short landscape viewport the dialog scrolls rather than clipping the
+   respawn button, which would otherwise be unreachable. */
+@media (max-height: 420px) {
+  .dialog--death {
+    max-height: calc(100vh - var(--unit) * 6);
+    overflow-y: auto;
+  }
+
+  .status-bars {
+    bottom: calc(var(--unit) * 13 + var(--safe-bottom));
+  }
+}
+
+
+/* ==========================================================================
+   Container screens: inventory, crafting table, furnace, chest
+   ==========================================================================
+   One layout serves all of them. Slot size comes from `--unit`, so the UI scale
+   setting moves everything together and touch targets stay comfortable on a
+   phone without a second set of media queries. */
+
+.screen--container {
+  /* Scrollable, because a chest plus a 36-slot inventory plus a recipe book does
+     not fit a short landscape phone viewport. Without this the Close button
+     becomes unreachable. */
+  overflow-y: auto;
+  align-items: flex-start;
+  padding: calc(var(--unit) * 2) 0;
+}
+
+.dialog--container {
+  max-width: calc(var(--unit) * 130);
+  width: calc(100vw - var(--unit) * 4);
+  margin: auto;
+}
+
+.container-title {
+  margin-bottom: calc(var(--unit) * 2);
+}
+
+.container-upper,
+.container-lower {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--unit) * 3);
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.container-divider {
+  height: 1px;
+  background: var(--color-edge-light);
+  margin: calc(var(--unit) * 3) 0;
+  opacity: 0.5;
+}
+
+.container-panel {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1);
+}
+
+.container-panel-label {
+  font-size: calc(var(--unit) * 2.5);
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.container-hint {
+  margin: calc(var(--unit) * 2) 0 0;
+  font-size: calc(var(--unit) * 2.6);
+  color: var(--color-text-faint);
+  line-height: 1.5;
+}
+
+/* --- slots --- */
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--slot-columns, 9), auto);
+  gap: calc(var(--unit) * 0.75);
+}
+
+.slot {
+  position: relative;
+  /* 11 units matches the hotbar, which keeps a comfortable ~44px target at the
+     default scale. */
+  width: calc(var(--unit) * 11);
+  height: calc(var(--unit) * 11);
+  background: rgba(20, 24, 29, 0.85);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-edge-dark);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  /* Stops a tap from also scrolling or triggering a browser gesture. */
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.slot:hover {
+  background: rgba(46, 53, 61, 0.9);
+}
+
+.slot:focus-visible {
+  outline: calc(var(--unit) * 0.5) solid var(--color-accent);
+  outline-offset: calc(var(--unit) * -0.5);
+  z-index: 1;
+}
+
+.slot.is-selected {
+  background: rgba(60, 70, 80, 0.95);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-accent);
+}
+
+/* A result slot reads differently so it is obvious you can only take from it. */
+.slot.is-takeonly {
+  background: rgba(38, 30, 20, 0.85);
+  box-shadow: inset 0 0 0 calc(var(--unit) * 0.5) var(--color-warning);
+}
+
+.slot-icon {
+  width: 80%;
+  height: 80%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.slot-count,
+.cursor-count {
+  position: absolute;
+  right: calc(var(--unit) * 0.75);
+  bottom: calc(var(--unit) * 0.25);
+  font-size: calc(var(--unit) * 2.75);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
+}
+
+.slot-durability {
+  position: absolute;
+  left: calc(var(--unit) * 0.75);
+  right: calc(var(--unit) * 0.75);
+  bottom: calc(var(--unit) * 0.75);
+  height: calc(var(--unit) * 0.75);
+  background: rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.slot-durability-fill {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+/* The crafting result gets extra breathing room so it does not read as part of
+   the input grid. */
+.slot-grid--result {
+  margin-top: calc(var(--unit) * 3);
+}
+
+.slot-grid--chest {
+  /* A 27-slot chest is scrolled rather than shrunk on a narrow viewport: a
+     smaller slot would break the touch target guarantee. */
+  max-width: calc(100vw - var(--unit) * 8);
+  overflow-x: auto;
+}
+
+/* --- the held stack --- */
+
+.cursor-stack {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: calc(var(--unit) * 10);
+  height: calc(var(--unit) * 10);
+  /* Offset so the stack sits next to the pointer rather than under it, which
+     would make the slot beneath un-hoverable. */
+  margin: calc(var(--unit) * -5) 0 0 calc(var(--unit) * -5);
+  pointer-events: none;
+  z-index: 60;
+  filter: drop-shadow(0 calc(var(--unit) * 0.75) calc(var(--unit) * 1) rgba(0, 0, 0, 0.6));
+}
+
+.cursor-icon {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/* --- furnace gauges --- */
+
+.container-extra {
+  margin-top: calc(var(--unit) * 2);
+}
+
+.furnace-gauges {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--unit) * 1.5);
+  max-width: calc(var(--unit) * 70);
+  margin: 0 auto;
+}
+
+.furnace-gauge {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 2);
+}
+
+.furnace-gauge-label {
+  flex: 0 0 calc(var(--unit) * 16);
+  font-size: calc(var(--unit) * 2.6);
+  color: var(--color-text-dim);
+}
+
+.gauge-track {
+  flex: 1;
+  height: calc(var(--unit) * 2.5);
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 0 1px var(--color-edge-dark);
+  overflow: hidden;
+}
+
+.gauge-fill {
+  height: 100%;
+  width: 0%;
+  /* Short transition so the bars glide rather than stepping, without lagging
+     behind the simulation enough to look wrong. */
+  transition: width 120ms linear;
+}
+
+.gauge-fill--fuel {
+  background: linear-gradient(90deg, #d9702f, #f0b64a);
+}
+
+.gauge-fill--cook {
+  background: linear-gradient(90deg, #4e9134, var(--color-accent-glow));
+}
+
+/* --- recipe book --- */
+
+.recipe-book {
+  margin-top: calc(var(--unit) * 2);
+  border: 1px solid var(--color-edge-dark);
+  background: rgba(0, 0, 0, 0.25);
+  padding: calc(var(--unit) * 1.5);
+}
+
+.recipe-book > summary {
+  cursor: pointer;
+  font-size: calc(var(--unit) * 2.8);
+  color: var(--color-text-dim);
+  padding: calc(var(--unit) * 0.5);
+}
+
+.recipe-search {
+  width: 100%;
+  margin: calc(var(--unit) * 1.5) 0;
+}
+
+.recipe-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--unit) * 34), 1fr));
+  gap: calc(var(--unit) * 1);
+  max-height: calc(var(--unit) * 48);
+  overflow-y: auto;
+  /* Keeps a flick-scroll from bubbling out to the dialog behind it. */
+  overscroll-behavior: contain;
+}
+
+.recipe-entry {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--unit) * 1.5);
+  justify-content: flex-start;
+  text-align: left;
+  padding: calc(var(--unit) * 1);
+  min-height: calc(var(--unit) * 10);
+  font-size: calc(var(--unit) * 2.6);
+}
+
+/* A recipe you cannot currently afford stays visible and clickable — it still
+   shows what is missing — but is clearly marked. */
+.recipe-entry.is-unavailable {
+  opacity: 0.45;
+}
+
+.recipe-icon {
+  width: calc(var(--unit) * 7);
+  height: calc(var(--unit) * 7);
+  image-rendering: pixelated;
+  flex: 0 0 auto;
+}
+
+.recipe-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: calc(var(--unit) * 2.6);
+}
+
+/* On a narrow viewport the panels stack and the inventory grid stays 9 wide,
+   scrolling horizontally rather than shrinking the slots. */
+@media (max-width: 620px) {
+  .container-upper,
+  .container-lower {
+    gap: calc(var(--unit) * 2);
+  }
+
+  .slot-grid--player,
+  .slot-grid--chest {
+    max-width: calc(100vw - var(--unit) * 8);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .container-hint {
+    font-size: calc(var(--unit) * 2.4);
+  }
+}
+
+
+/* ==========================================================================
+   Crosshair feedback
+   ==========================================================================
+   The crosshair carries two independent signals so neither needs its own widget:
+   the held tool will not harvest the target, and the weapon is still recharging.
+   Both are colour/opacity only, so they read instantly without adding clutter to
+   the centre of the screen. */
+
+.crosshair.is-wrong-tool {
+  /* Amber, matching the "take only" slot styling, so wrong-tool and can't-put-here
+     read as the same class of warning. */
+  background-color: var(--color-warning);
+  box-shadow: 0 0 calc(var(--unit) * 1) rgba(224, 166, 60, 0.9);
+}
+
+.crosshair.is-recharging {
+  /* Fades in as the weapon recharges. Multiplied into the base opacity rather
+     than replacing it, so the crosshair never disappears entirely. */
+  opacity: calc(0.35 + var(--attack-readiness, 1) * 0.65);
+}
+
+/* ==========================================================================
+   Item detail popover (long-press on touch, hover on desktop)
+   ==========================================================================
+   Touch has no hover, so the only way to inspect an item's stats on a phone is an
+   explicit gesture. Long-press already splits a stack in a container, so item
+   details are bound to a long-press on the *hotbar*, where splitting is
+   meaningless. */
+
+.item-details {
+  position: fixed;
+  z-index: 70;
+  max-width: calc(var(--unit) * 60);
+  padding: calc(var(--unit) * 2);
+  background: rgba(12, 15, 19, 0.96);
+  border: 1px solid var(--color-edge-light);
+  box-shadow: 0 calc(var(--unit) * 1) calc(var(--unit) * 3) rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  font-size: calc(var(--unit) * 2.7);
+  line-height: 1.6;
+}
+
+.item-details[hidden] {
+  display: none;
+}
+
+.item-details-name {
+  display: block;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: calc(var(--unit) * 1);
+}
+
+.item-details-row {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--unit) * 3);
+  color: var(--color-text-dim);
+}
+
+.item-details-row > span:last-child {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.item-details-note {
+  display: block;
+  margin-top: calc(var(--unit) * 1);
+  color: var(--color-text-faint);
+  font-size: calc(var(--unit) * 2.5);
+}
+
+
+/* ==========================================================================
+   Controls reference (Settings > Controls)
+   ==========================================================================
+   Generated from the binding tables, so it cannot drift from what the keys
+   actually do. */
+
+.controls-reference {
+  margin-top: calc(var(--unit) * 4);
+  padding-top: calc(var(--unit) * 3);
+  border-top: 1px solid var(--color-edge-dark);
+}
+
+.controls-heading {
+  margin: 0 0 calc(var(--unit) * 2);
+  font-size: calc(var(--unit) * 3.25);
+  color: var(--color-text);
+}
+
+.controls-list {
+  display: grid;
+  /* Two columns on a wide dialog, one on a phone. */
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--unit) * 56), 1fr));
+  gap: calc(var(--unit) * 0.5) calc(var(--unit) * 4);
+}
+
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--unit) * 2);
+  padding: calc(var(--unit) * 0.75) 0;
+  border-bottom: 1px solid rgba(74, 84, 94, 0.25);
+  font-size: calc(var(--unit) * 2.7);
+}
+
+.controls-action {
+  color: var(--color-text-dim);
+}
+
+.controls-keys {
+  color: var(--color-text);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.controls-note {
+  margin: calc(var(--unit) * 2.5) 0 0;
+  color: var(--color-text-faint);
+  font-size: calc(var(--unit) * 2.5);
+  line-height: 1.6;
+}

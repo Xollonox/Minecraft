@@ -1,0 +1,29 @@
+Minecraft-W Phase 3 systems build v6.0.0
+Validated: 2026-08-10 UTC
+
+PASS  npm run audit
+      136 modules, 444 relative imports, no import/export problems
+
+PASS  npm run selftest
+      1240/1240 existing deterministic checks
+
+PASS  npm run selftest:phase3
+      17/17 Phase 3 deterministic checks
+
+PASS  npm run build
+      Vite production build, 151 modules transformed
+
+PASS  npm run smoketest
+      Standalone 2.7 MB build-smoke HTML generated
+
+BLOCKED  npm run smoketest:browser
+      Playwright 1.62.1 is installed, but its Chromium binary cannot be downloaded
+      in this execution environment. This is an environment test-runtime gap, not
+      a passing browser result. Run `npx playwright install chromium` followed by
+      `npm run smoketest:browser` on a normal networked machine.
+
+Honesty note:
+This package integrates the Phase 3 mechanical systems into the live runtime and
+save record. It does not falsely claim that the full five-phase roadmap is at 79%:
+the original Phase 2 mob, biome, village, structure and renderer-content gaps are
+still present and remain listed in ROADMAP-REMAINING.md.

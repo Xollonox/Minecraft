@@ -1,0 +1,34 @@
+{
+  "name": "voxel-sandbox",
+  "private": true,
+  "version": "9.0.0",
+  "type": "module",
+  "description": "An original Minecraft-style voxel sandbox engine built with Three.js. Unofficial, not affiliated with Mojang.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "selftest": "node scripts/selftest.mjs",
+    "selftest:phase3": "node scripts/phase3-selftest.mjs",
+    "selftest:phase4": "node scripts/phase4-selftest.mjs",
+    "selftest:phase5": "node scripts/phase5-selftest.mjs",
+    "selftest:v7": "node scripts/v7-selftest.mjs",
+    "selftest:v8": "node scripts/v8-selftest.mjs",
+    "selftest:v9": "node scripts/v9-selftest.mjs",
+    "smoketest": "node scripts/build-smoketest.mjs",
+    "smoketest:browser": "node scripts/browser-smoketest.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "serve:dist": "node scripts/serve.mjs",
+    "audit": "node scripts/audit-imports.mjs",
+    "check": "npm run audit && npm run selftest && npm run selftest:phase3 && npm run selftest:phase4 && npm run selftest:phase5 && npm run selftest:v7 && npm run selftest:v8 && npm run selftest:v9 && npm run build"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^149.0.0",
+    "playwright": "^1.62.1",
+    "vite": "^7.1.5"
+  }
+}

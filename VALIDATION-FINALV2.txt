@@ -1,0 +1,30 @@
+Minecraft-W FinalV2 validation report
+=====================================
+
+Validated source commit before release metadata: e53be39990642feac9326e514dabf46b466e930b
+Package version: 2.0.0
+Packaged (UTC): 2026-08-09T11:59:05Z
+
+PASSED
+------
+- Deterministic regression suite: 965/965 checks passed
+- Import/export audit: 120 modules, 426 relative imports, no problems
+- JavaScript syntax: 126 JS/MJS files passed node --check
+- Whitespace/patch validation: git diff --check passed
+- Git working source was clean before release metadata files were generated
+
+BROWSER/BUILD STATUS
+--------------------
+- Chromium executable is installed at /usr/bin/chromium.
+- node_modules is intentionally not included in the source archive.
+- npm ci could not be completed inside this sandbox because its internal npm mirror returned
+  HTTP 404 for the locked Vite tarball. Therefore a local Vite production build and WebGL run
+  were not claimed as passed here.
+- .github/workflows/ci.yml installs dependencies, builds the production bundle, installs
+  Playwright Chromium, runs the WebGL gameplay smoke test, and uploads screenshots/diagnostics.
+
+IMPORTANT SCOPE NOTE
+--------------------
+FinalV2 contains major Phase 1-3 engine and gameplay foundations, but it is not represented as a
+complete implementation of every Minecraft mechanic. See FINALV2-IMPLEMENTATION.md and
+ROADMAP-REMAINING.md for exact shipped scope and remaining systems.

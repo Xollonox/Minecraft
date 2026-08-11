@@ -1,0 +1,27 @@
+Minecraft-W / Voxel Sandbox Version 9 validation
+=================================================
+Validated: 2026-08-11 UTC
+
+PASS  import audit                 165 modules / 553 relative imports
+PASS  core deterministic suite    1593 / 1593 checks
+PASS  Phase 3 suite               20 / 20 checks
+PASS  Phase 4 suite               35 / 35 checks
+PASS  Phase 5 suite               41 / 41 checks
+PASS  Version 7 compatibility     26 / 26 checks
+PASS  Version 8 compatibility     21 / 21 checks
+PASS  Version 9 improvement       30 / 30 checks
+PASS  production Vite build       190 modules transformed
+PASS  built-page smoke artifact   3375 KB
+PASS  npm audit                   0 vulnerabilities
+PASS  Chromium/WebGL campaign     202 / 202 checks
+PASS  unexpected console errors   0
+
+Browser coverage includes production startup, WebGL 2 and worker streaming, the five-option world
+menu, the detailed third-person voxel avatar, shared mob shadows, Chug Tuff one-life UI, 70-second
+water-shader stability, survival HUD, inventory, crafting, furnace, chest, combat, death/respawn,
+save/reload, High-preset SSAO, the visible Eye, full dragon battle and resummoning, credits, and a
+390 px phone layout.
+
+The browser run used Chromium WebGL 2 through software SwiftShader. It certifies functional rendering
+in that environment and is not a hardware performance benchmark. The project uses original generated
+art and does not claim exact Minecraft model or ruleset parity.
