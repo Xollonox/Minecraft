@@ -337,7 +337,7 @@ try {
   await page.setViewportSize({ width: 1024, height: 640 });
   const logs = attachConsole(page);
 
-  const shoot = (name) => page.screenshot({ path: join(OUT, `${name}.png`) });
+  const shoot = (name) => page.screenshot({ path: join(OUT, `${name}.png`), timeout: 60000 }).catch((e) => console.warn(`screenshot ${name} failed: ${e.message}`));
 
   section('World creation');
 
