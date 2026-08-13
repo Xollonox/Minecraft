@@ -21,9 +21,48 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Apply audited hybrid source patch
+      - name: Reconstruct and verify audited hybrid source patch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gzip -dc pebble-hybrid.patch.gz > /tmp/pebble-hybrid.patch
+          python3 - <<'PY'
+          import base64, json, os, urllib.request
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          shas = [
+              'dcd36f33ddb214d59848d7bdd4c4108f78ed2220',
+              '66d1463001e4b0e6c1ee1086f16242997a45f9dd',
+              'a71c810f54cb5db84d50cf0678e096a31397d79c',
+              '6bc25af90c05f9a2be58deba878b568855f11b3d',
+              'c82c7bce6ee8103787ea35050445eda866612c0e',
+              '422eeef41aa7626ada565be0a8260caf607d56c2',
+              '2b36767e27398cd4d8e42c92b80b68f67298f198',
+              '838e1ebf80386b02e569ece3518eb4cec98651d7',
+              '2c3fb5886578512d926572798872aa9cac0606f7',
+              '43f762d8f56c2fa345bb422ef25424525e2087fd',
+              '35fdbc1f3957683b4c8ff688bc2863cba5c62599',
+              '10dddbe753af6c94feafbadbf822b26114041cc6',
+              '6d08b3e4224eba69a4bda7537e1fc9ded980cd1e',
+          ]
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'pebble-hybrid-verify',
+          }
+          with open('/tmp/pebble-hybrid.patch', 'wb') as target:
+              for sha in shas:
+                  req = urllib.request.Request(
+                      f'https://api.github.com/repos/{repo}/git/blobs/{sha}',
+                      headers=headers,
+                  )
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      payload = json.load(response)
+                  target.write(base64.b64decode(payload['content']))
+          PY
+          test "$(wc -c < /tmp/pebble-hybrid.patch)" -eq 92730
+          echo "1e1c909b6390fb419c0726e65fecd42ee4750cfb3c1e0dd7fec44f75492d90c3  /tmp/pebble-hybrid.patch" | sha256sum -c -
           git apply --check /tmp/pebble-hybrid.patch
           git apply /tmp/pebble-hybrid.patch
           test -f src/core/PebbleDeterminism.js
@@ -88,7 +127,7 @@ jobs:
           cp -a dist/. release/
           cp -a src scripts public .github release/_source/
           cp package.json package-lock.json index.html vite.config.js LICENSE README.md THIRD_PARTY_NOTICES.md PEBBLE-HYBRID.md release/_source/
-          cp pebble-hybrid.patch.gz release/_source/
+          cp /tmp/pebble-hybrid.patch release/_source/pebble-hybrid.patch
           cp THIRD_PARTY_NOTICES.md PEBBLE-HYBRID.md release/
           printf '%s\n' 'Static root is deployable directly to EdgeOne Pages. Full patched source is in _source/.' > release/RELEASE-README.txt
           (cd release && zip -qr ../final.zip .)
