@@ -1,0 +1,106 @@
+name: Pebble Hybrid Verify
+
+on:
+  push:
+    branches: [pebble-hybrid-final]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pebble-hybrid-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Apply audited hybrid source patch
+        run: |
+          gzip -dc pebble-hybrid.patch.gz > /tmp/pebble-hybrid.patch
+          git apply --check /tmp/pebble-hybrid.patch
+          git apply /tmp/pebble-hybrid.patch
+          test -f src/core/PebbleDeterminism.js
+          test -f src/world/VillageSystem.js
+          test -f src/entities/VehicleEntity.js
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit imports
+        run: npm run audit
+
+      - name: Check JavaScript syntax
+        run: find src scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+
+      - name: Core regression suite
+        run: npm run selftest
+
+      - name: Phase 3 regression suite
+        run: npm run selftest:phase3
+
+      - name: Phase 4 regression suite
+        run: npm run selftest:phase4
+
+      - name: Phase 5 regression suite
+        run: npm run selftest:phase5
+
+      - name: Version 7 compatibility suite
+        run: npm run selftest:v7
+
+      - name: Version 8 compatibility suite
+        run: npm run selftest:v8
+
+      - name: Version 9 compatibility suite
+        run: npm run selftest:v9
+
+      - name: Pebble hybrid regression suite
+        run: npm run selftest:hybrid
+
+      - name: Production build
+        run: npm run build
+
+      - name: Static build smoke test
+        run: npm run smoketest
+
+      - name: Install Chromium runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser/WebGL smoke test
+        run: npm run smoketest:browser
+
+      - name: Stage direct EdgeOne release
+        run: |
+          rm -rf release final.zip final.zip.sha256
+          mkdir -p release/_source
+          cp -a dist/. release/
+          cp -a src scripts public .github release/_source/
+          cp package.json package-lock.json index.html vite.config.js LICENSE README.md THIRD_PARTY_NOTICES.md PEBBLE-HYBRID.md release/_source/
+          cp pebble-hybrid.patch.gz release/_source/
+          cp THIRD_PARTY_NOTICES.md PEBBLE-HYBRID.md release/
+          printf '%s\n' 'Static root is deployable directly to EdgeOne Pages. Full patched source is in _source/.' > release/RELEASE-README.txt
+          (cd release && zip -qr ../final.zip .)
+          sha256sum final.zip > final.zip.sha256
+          unzip -t final.zip
+
+      - name: Upload verified final release
+        uses: actions/upload-artifact@v4
+        with:
+          name: pebble-hybrid-final
+          path: |
+            final.zip
+            final.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
